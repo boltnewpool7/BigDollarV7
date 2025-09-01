@@ -2,18 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, Sparkles, Star } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { Guide } from '../types';
+import { Guide, PrizeCategory } from '../types';
 
 interface WinnerAnimationProps {
   isVisible: boolean;
   winners: Guide[];
   onComplete: () => void;
+  prizeCategory?: PrizeCategory | null;
 }
 
 export const WinnerAnimation: React.FC<WinnerAnimationProps> = ({
   isVisible,
   winners,
-  onComplete
+  onComplete,
+  prizeCategory
 }) => {
   const [currentWinnerIndex, setCurrentWinnerIndex] = useState(0);
   const [isRevealing, setIsRevealing] = useState(false);
@@ -99,7 +101,7 @@ export const WinnerAnimation: React.FC<WinnerAnimationProps> = ({
                 transition={{ delay: 0.3 }}
                 className="text-4xl font-bold text-white mb-4"
               >
-                🎉 WINNER #{currentWinnerIndex + 1} 🎉
+                {prizeCategory ? `${prizeCategory.icon} ${prizeCategory.name} WINNER #{currentWinnerIndex + 1} ${prizeCategory.icon}` : `🎉 WINNER #{currentWinnerIndex + 1} 🎉`}
               </motion.h2>
 
               <motion.div
@@ -153,7 +155,7 @@ export const WinnerAnimation: React.FC<WinnerAnimationProps> = ({
             className="bg-white/20 backdrop-blur-xl rounded-3xl p-8 border border-white/30"
           >
             <h2 className="text-3xl font-bold text-white text-center mb-8">
-              🏆 Congratulations to All Winners! 🏆
+              {prizeCategory ? `${prizeCategory.icon} Congratulations to All ${prizeCategory.name} Winners! ${prizeCategory.icon}` : `🏆 Congratulations to All Winners! 🏆`}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
               {revealedWinners.map((winner, index) => (

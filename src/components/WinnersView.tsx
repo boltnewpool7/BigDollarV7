@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
-import { Trophy, Calendar, User, Award, Percent, Ticket, TrendingUp, Sparkles, Trash2 } from 'lucide-react';
+import { Trophy, Calendar, User, Award, Percent, Ticket, TrendingUp, Sparkles, Trash2, Gift } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useWinners } from '../hooks/useWinners';
+import { prizeCategories } from '../data/prizeCategories';
 
 export const WinnersView: React.FC = () => {
   const { winners, loading, purgeWinners } = useWinners();
@@ -45,6 +46,16 @@ export const WinnersView: React.FC = () => {
     return Array.from(deptMap.entries()).sort((a, b) => b[1] - a[1]);
   }, [winners]);
 
+  const prizeStats = useMemo(() => {
+    return prizeCategories.map(category => {
+      const categoryWinners = winners.filter(w => w.prize_category === category.id);
+      return {
+        ...category,
+        winnersCount: categoryWinners.length,
+        winners: categoryWinners
+      };
+    });
+  }, [winners]);
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -157,6 +168,45 @@ export const WinnersView: React.FC = () => {
         </div>
       )}
 
+      {/* Prize Categories Breakdown */}
+      {winners.length > 0 && (
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl">
+          <h3 className="text-xl font-semibold text-white mb-6 flex items-center">
+            <Gift className="w-5 h-5 mr-2 text-yellow-300" />
+            Winners by Prize Category
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {prizeStats.map((prize) => (
+              <motion.div
+                key={prize.id}
+                whileHover={{ scale: 1.05 }}
+                className={`bg-white/20 backdrop-blur-sm rounded-xl p-4 border transition-all duration-300 ${
+                  prize.winnersCount > 0 
+                    ? 'border-green-400/50 bg-green-500/10' 
+                    : 'border-white/20'
+                }`}
+              >
+                <div className="text-center">
+                  <div className="text-3xl mb-2">{prize.icon}</div>
+                  <h4 className="font-bold text-white text-xs mb-1">{prize.name}</h4>
+                  <div className="text-2xl font-bold bg-gradient-to-r from-yellow-300 to-orange-300 bg-clip-text text-transparent">
+                    {prize.winnersCount}
+                  </div>
+                  <p className="text-xs text-blue-200 font-medium">
+                    of {prize.winnerCount} winners
+                  </p>
+                  <div className="w-full bg-white/20 rounded-full h-1 mt-2">
+                    <div
+                      className={`h-1 rounded-full bg-gradient-to-r ${prize.gradient} transition-all duration-500`}
+                      style={{ width: `${(prize.winnersCount / prize.winnerCount) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      )}
       {/* Winners List */}
       <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl overflow-hidden border border-white/20">
         <div className="px-6 py-4 border-b border-white/20 bg-white/20 backdrop-blur-sm">
@@ -188,6 +238,9 @@ export const WinnersView: React.FC = () => {
             <table className="w-full">
               <thead className="bg-white/20 backdrop-blur-sm">
                 <tr>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
+                    Prize
+                  </th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-white uppercase tracking-wider">
                     Winner
                   </th>
@@ -225,6 +278,25 @@ export const WinnersView: React.FC = () => {
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
+                        {prizeCategories.find(p => p.id === winner.prize_category) && (
+                          <>
+                            <span className="text-2xl mr-2">
+                              {prizeCategories.find(p => p.id === winner.prize_category)?.icon}
+                            </span>
+                            <div>
+                              <div className="text-sm font-bold text-white">
+                                {prizeCategories.find(p => p.id === winner.prize_category)?.name}
+                              </div>
+                              <div className="text-xs text-blue-200">
+                                {prizeCategories.find(p => p.id === winner.prize_category)?.description}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
                         <div className="w-12 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
                           <span className="text-white font-medium text-sm">
                             {winner.name.split(' ').map(n => n[0]).join('')}
@@ -235,7 +307,9 @@ export const WinnersView: React.FC = () => {
                             {winner.name}
                             <Trophy className="w-4 h-4 ml-2 text-yellow-400" />
                           </div>
-                          <div className="text-xs text-blue-200 font-medium">🏆 Winner #{winners.length - index}</div>
+                          <div className="text-xs text-blue-200 font-medium">
+                            🏆 {prizeCategories.find(p => p.id === winner.prize_category)?.name || 'Winner'}
+                          </div>
                         </div>
                       </div>
                     </td>

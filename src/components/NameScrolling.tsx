@@ -1,19 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Guide } from '../types';
+import { Guide, PrizeCategory } from '../types';
 
 interface NameScrollingProps {
   guides: Guide[];
   isScrolling: boolean;
   onComplete: (winners: Guide[]) => void;
   winnerCount: number;
+  prizeCategory?: PrizeCategory | null;
 }
 
 export const NameScrolling: React.FC<NameScrollingProps> = ({
   guides,
   isScrolling,
   onComplete,
-  winnerCount
+  winnerCount,
+  prizeCategory
 }) => {
   const [phase, setPhase] = useState<'countdown' | 'revealing' | 'complete'>('countdown');
   const [countdown, setCountdown] = useState(15);
@@ -125,7 +127,7 @@ export const NameScrolling: React.FC<NameScrollingProps> = ({
               transition={{ duration: 1, repeat: Infinity }}
               className="text-4xl md:text-5xl font-bold text-white mb-8"
             >
-              🎲 SELECTING WINNER #{currentWinnerIndex + 1} 🎲
+              {prizeCategory ? `${prizeCategory.icon} SELECTING ${prizeCategory.name} WINNER #{currentWinnerIndex + 1} ${prizeCategory.icon}` : `🎲 SELECTING WINNER #{currentWinnerIndex + 1} 🎲`}
             </motion.h2>
 
             <div className="bg-white/20 backdrop-blur-xl rounded-3xl p-8 md:p-12 border border-white/30 shadow-2xl min-h-[400px] flex items-center justify-center">
@@ -169,7 +171,7 @@ export const NameScrolling: React.FC<NameScrollingProps> = ({
               transition={{ duration: 1, repeat: Infinity }}
               className="text-4xl md:text-5xl font-bold text-white mb-8"
             >
-              🏆 WINNER #{currentWinnerIndex + 1} 🏆
+              {prizeCategory ? `${prizeCategory.icon} ${prizeCategory.name} WINNER #{currentWinnerIndex + 1} ${prizeCategory.icon}` : `🏆 WINNER #{currentWinnerIndex + 1} 🏆`}
             </motion.h2>
 
             <motion.div

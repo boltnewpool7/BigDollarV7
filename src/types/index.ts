@@ -28,3 +28,18 @@ export interface RaffleSettings {
   drawFrom: 'all' | 'departments';
   selectedDepartments: string[];
 }
+
+export interface PrizeCategory {
+  id: string;
+  name: string;
+  description: string;
+  winnerCount: number;
+  image: string;
+  gradient: string;
+  icon: string;
+}
+
+export interface PrizeWinner extends Winner {
+  prize_category: string;
+  prize_name: string;
+}

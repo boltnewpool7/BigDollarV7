@@ -1,26 +1,24 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Shuffle, Settings, Trophy, Users, Ticket, Trash2, Sparkles } from 'lucide-react';
-import { Guide, Winner, RaffleSettings } from '../types';
+import { Shuffle, Trophy, Users, Ticket, Trash2, Sparkles, Gift } from 'lucide-react';
+import { Guide, Winner, PrizeCategory } from '../types';
 import { useWinners } from '../hooks/useWinners';
-import { RaffleModal } from './RaffleModal';
+import { PrizeSelectionModal } from './PrizeSelectionModal';
+import { PrizeDrawModal } from './PrizeDrawModal';
 import { NameScrolling } from './NameScrolling';
 import { WinnerAnimation } from './WinnerAnimation';
+import { prizeCategories } from '../data/prizeCategories';
 import confetti from 'canvas-confetti';
 import guidesData from '../data/guides.json';
 
 export const RaffleView: React.FC = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [settings, setSettings] = useState<RaffleSettings>({
-    maxWinners: 5,
-    drawFrom: 'all',
-    selectedDepartments: []
-  });
+  const [isPrizeSelectionOpen, setIsPrizeSelectionOpen] = useState(false);
+  const [isPrizeDrawOpen, setIsPrizeDrawOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<PrizeCategory | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
   const [showWinnerAnimation, setShowWinnerAnimation] = useState(false);
   const [animationWinners, setAnimationWinners] = useState<Guide[]>([]);
-  const [lastDrawResults, setLastDrawResults] = useState<Guide[]>([]);
 
   const { winners, addWinners, purgeWinners } = useWinners();
   const guides = guidesData as Guide[];
@@ -30,31 +28,19 @@ export const RaffleView: React.FC = () => {
     return guides.filter(guide => !winnerIds.has(guide.id));
   }, [guides, winners]);
 
-  const filteredGuides = useMemo(() => {
-    if (settings.drawFrom === 'all') {
-      return availableGuides;
-    }
-    
-    if (settings.selectedDepartments.length === 0) {
-      return availableGuides;
-    }
-    
-    return availableGuides.filter(guide => 
-      settings.selectedDepartments.includes(guide.department)
-    );
-  }, [availableGuides, settings]);
-
-  const departments = useMemo(() => {
-    return Array.from(new Set(guides.map(guide => guide.department))).sort();
-  }, [guides]);
+  const handleSelectPrize = (category: PrizeCategory) => {
+    setSelectedCategory(category);
+    setIsPrizeSelectionOpen(false);
+    setIsPrizeDrawOpen(true);
+  };
 
   const handleRunRaffle = async () => {
-    if (filteredGuides.length === 0) {
-      alert('No guides available for the raffle with current settings.');
+    if (!selectedCategory || availableGuides.length < selectedCategory.winnerCount) {
       return;
     }
 
     setIsDrawing(true);
+    setIsPrizeDrawOpen(false);
     setIsScrolling(true);
   };
 
@@ -67,8 +53,10 @@ export const RaffleView: React.FC = () => {
   const handleAnimationComplete = async () => {
     setShowWinnerAnimation(false);
     
-    // Save to database
-    const winnersData: Winner[] = animationWinners.map(guide => ({
+    if (!selectedCategory) return;
+
+    // Save to database with prize category
+    const winnersData: any[] = animationWinners.map(guide => ({
       id: crypto.randomUUID(),
       guide_id: guide.id,
       name: guide.name,
@@ -78,13 +66,14 @@ export const RaffleView: React.FC = () => {
       nrpc: guide.nrpc,
       refund_percent: guide.refundPercent,
       total_tickets: guide.totalTickets,
+      prize_category: selectedCategory.id,
+      prize_name: selectedCategory.name,
       won_at: new Date().toISOString(),
       created_at: new Date().toISOString()
     }));
 
     try {
       await addWinners(winnersData);
-      setLastDrawResults(animationWinners);
       
       // Final celebration confetti
       confetti({
@@ -99,7 +88,7 @@ export const RaffleView: React.FC = () => {
     }
     
     setIsDrawing(false);
-    setIsModalOpen(false);
+    setSelectedCategory(null);
   };
 
   const handlePurgeWinners = async () => {
@@ -115,7 +104,6 @@ export const RaffleView: React.FC = () => {
     if (confirmed) {
       try {
         await purgeWinners();
-        setLastDrawResults([]);
         alert('All winners have been successfully purged!');
       } catch (error) {
         console.error('Failed to purge winners:', error);
@@ -125,12 +113,23 @@ export const RaffleView: React.FC = () => {
   };
 
   const stats = useMemo(() => {
-    const totalTickets = filteredGuides.reduce((sum, guide) => sum + guide.totalTickets, 0);
-    const avgNPS = filteredGuides.length > 0 ? 
-      filteredGuides.reduce((sum, guide) => sum + guide.nps, 0) / filteredGuides.length : 0;
+    const totalTickets = availableGuides.reduce((sum, guide) => sum + guide.totalTickets, 0);
+    const avgNPS = availableGuides.length > 0 ? 
+      availableGuides.reduce((sum, guide) => sum + guide.nps, 0) / availableGuides.length : 0;
     
     return { totalTickets, avgNPS };
-  }, [filteredGuides]);
+  }, [availableGuides]);
+
+  const prizeStats = useMemo(() => {
+    return prizeCategories.map(category => {
+      const categoryWinners = winners.filter(w => w.prize_category === category.id);
+      return {
+        ...category,
+        currentWinners: categoryWinners.length,
+        isCompleted: categoryWinners.length >= category.winnerCount
+      };
+    });
+  }, [winners]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 space-y-6 p-6">
@@ -139,9 +138,9 @@ export const RaffleView: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-4xl font-bold mb-2 bg-gradient-to-r from-yellow-300 to-pink-300 bg-clip-text text-transparent">
-              🎪 Contest Raffle System 🎪
+              🎪 Multi-Prize Contest System 🎪
             </h2>
-            <p className="text-blue-100 text-lg">Run magical lottery draws with spectacular animations!</p>
+            <p className="text-blue-100 text-lg">Conduct magical draws for different prize categories!</p>
           </div>
           <motion.div
             animate={{ 
@@ -154,7 +153,7 @@ export const RaffleView: React.FC = () => {
               repeatType: "reverse"
             }}
           >
-            <Sparkles className="w-16 h-16 text-yellow-300" />
+            <Gift className="w-16 h-16 text-yellow-300" />
           </motion.div>
         </div>
       </div>
@@ -165,7 +164,8 @@ export const RaffleView: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-blue-200 text-sm font-medium">Available Guides</p>
-              <p className="text-3xl font-bold text-white">{filteredGuides.length}</p>
+              <p className="text-3xl font-bold text-white">{availableGuides.length}</p>
+              <p className="text-xs text-blue-300 mt-1">from {guides.length} total</p>
             </div>
             <Users className="w-10 h-10 text-blue-300" />
           </div>
@@ -192,20 +192,56 @@ export const RaffleView: React.FC = () => {
         </div>
       </div>
 
+      {/* Prize Categories Overview */}
+      <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl">
+        <h3 className="text-2xl font-semibold text-white mb-6 flex items-center">
+          <Gift className="w-6 h-6 mr-2 text-pink-300" />
+          Prize Categories Status
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {prizeStats.map((prize) => (
+            <motion.div
+              key={prize.id}
+              whileHover={{ scale: 1.02 }}
+              className={`bg-white/20 backdrop-blur-sm rounded-xl p-4 border transition-all duration-300 ${
+                prize.isCompleted 
+                  ? 'border-green-400/50 bg-green-500/20' 
+                  : 'border-white/20 hover:border-white/40'
+              }`}
+            >
+              <div className="text-center">
+                <div className="text-3xl mb-2">{prize.icon}</div>
+                <h4 className="font-bold text-white text-sm mb-1">{prize.name}</h4>
+                <div className="text-xs text-blue-200 mb-2">
+                  {prize.currentWinners}/{prize.winnerCount} winners
+                </div>
+                <div className="w-full bg-white/20 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full bg-gradient-to-r ${prize.gradient} transition-all duration-500`}
+                    style={{ width: `${(prize.currentWinners / prize.winnerCount) * 100}%` }}
+                  />
+                </div>
+                {prize.isCompleted && (
+                  <div className="text-green-300 text-xs font-semibold mt-2">✅ Complete</div>
+                )}
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
       {/* Raffle Controls */}
       <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl">
         <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
           <div>
             <h3 className="text-xl font-semibold text-white mb-3 flex items-center">
-              <Settings className="w-5 h-5 mr-2 text-blue-300" />
-              Current Settings
+              <Sparkles className="w-5 h-5 mr-2 text-blue-300" />
+              Contest Controls
             </h3>
             <div className="space-y-2 text-sm text-blue-100">
-              <p>Max Winners: <span className="font-medium">{settings.maxWinners}</span></p>
-              <p>Draw From: <span className="font-medium capitalize">{settings.drawFrom}</span></p>
-              {settings.drawFrom === 'departments' && settings.selectedDepartments.length > 0 && (
-                <p>Departments: <span className="font-medium">{settings.selectedDepartments.join(', ')}</span></p>
-              )}
+              <p>Total Guides in System: <span className="font-medium">{guides.length}</span></p>
+              <p>Available for Draw: <span className="font-medium">{availableGuides.length}</span></p>
+              <p>Total Winners Selected: <span className="font-medium">{winners.length}</span></p>
             </div>
           </div>
           
@@ -221,78 +257,50 @@ export const RaffleView: React.FC = () => {
             )}
             
             <button
-              onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center px-6 py-3 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full text-white hover:bg-white/30 focus:ring-4 focus:ring-white/50 transition-all duration-300 shadow-lg transform hover:scale-105"
-            >
-              <Settings className="w-5 h-5 mr-2" />
-              Configure
-            </button>
-            
-            <button
-              onClick={handleRunRaffle}
-              disabled={isDrawing || filteredGuides.length === 0}
+              onClick={() => setIsPrizeSelectionOpen(true)}
+              disabled={isDrawing || availableGuides.length === 0}
               className="inline-flex items-center px-8 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white rounded-full font-bold text-lg hover:from-green-600 hover:to-blue-600 focus:ring-4 focus:ring-green-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg transform hover:scale-105 disabled:transform-none"
             >
-              <Shuffle className="w-6 h-6 mr-2" />
-              {isDrawing ? '🎰 Drawing Magic...' : '🎲 Start the Magic!'}
+              <Gift className="w-6 h-6 mr-2" />
+              {isDrawing ? '🎰 Drawing Magic...' : '🎁 Select Prize & Draw!'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Last Draw Results */}
-      {lastDrawResults.length > 0 && (
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-white/20 shadow-xl">
-          <h3 className="text-xl font-semibold text-white mb-6 flex items-center">
-            <Trophy className="w-6 h-6 mr-2 text-yellow-400" />
-            Latest Draw Results
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {lastDrawResults.map((winner, index) => (
-              <motion.div
-                key={winner.id}
-                initial={{ opacity: 0, scale: 0.8, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="bg-white/20 backdrop-blur-sm rounded-xl p-4 border border-white/30 hover:bg-white/30 transition-all duration-300 transform hover:scale-105"
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-yellow-900 bg-gradient-to-r from-yellow-300 to-orange-400 px-3 py-1 rounded-full shadow-sm">
-                    #{index + 1}
-                  </span>
-                  <span className="text-xs text-blue-200 font-medium">{winner.totalTickets} tickets</span>
-                </div>
-                <h4 className="font-bold text-white text-lg">{winner.name}</h4>
-                <p className="text-sm text-blue-200 font-medium">{winner.department}</p>
-                <p className="text-xs text-blue-300 mt-1">Supervisor: {winner.supervisor}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <RaffleModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        settings={settings}
-        onSettingsChange={setSettings}
-        departments={departments}
+      <PrizeSelectionModal
+        isOpen={isPrizeSelectionOpen}
+        onClose={() => setIsPrizeSelectionOpen(false)}
         availableGuides={availableGuides}
-        onRunRaffle={handleRunRaffle}
+        onSelectPrize={handleSelectPrize}
+        existingWinners={winners}
+      />
+      
+      <PrizeDrawModal
+        isOpen={isPrizeDrawOpen}
+        onClose={() => {
+          setIsPrizeDrawOpen(false);
+          setSelectedCategory(null);
+        }}
+        category={selectedCategory}
+        onConfirmDraw={handleRunRaffle}
         isDrawing={isDrawing}
+        availableGuides={availableGuides.length}
       />
       
       <NameScrolling
-        guides={filteredGuides}
+        guides={availableGuides}
         isScrolling={isScrolling}
         onComplete={handleScrollingComplete}
-        winnerCount={Math.min(settings.maxWinners, filteredGuides.length)}
+        winnerCount={selectedCategory?.winnerCount || 1}
+        prizeCategory={selectedCategory}
       />
       
       <WinnerAnimation
         isVisible={showWinnerAnimation}
         winners={animationWinners}
         onComplete={handleAnimationComplete}
+        prizeCategory={selectedCategory}
       />
     </div>
   );

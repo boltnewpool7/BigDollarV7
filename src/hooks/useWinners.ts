@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../utils/supabase';
-import { Winner } from '../types';
+import { Winner, PrizeWinner } from '../types';
 
 export const useWinners = () => {
-  const [winners, setWinners] = useState<Winner[]>([]);
+  const [winners, setWinners] = useState<PrizeWinner[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchWinners = async () => {
@@ -22,7 +22,7 @@ export const useWinners = () => {
     }
   };
 
-  const addWinners = async (newWinners: Winner[]) => {
+  const addWinners = async (newWinners: any[]) => {
     try {
       const { error } = await supabase
         .from('winners')
